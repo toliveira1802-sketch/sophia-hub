@@ -2,4 +2,4 @@ fastapi
 uvicorn
 langgraph
 langchain-anthropic
-pydantic	
+pydantic
