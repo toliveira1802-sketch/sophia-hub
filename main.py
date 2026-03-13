@@ -61,29 +61,49 @@ grafo.add_edge(START, "Anna_SDR")
 grafo.add_edge("Anna_SDR", END)
 hub_app = grafo.compile()
 
+from fastapi import FastAPI, Request # <-- Adicionamos o Request aqui
+
+# ... [O resto do código lá em cima continua igual (estado, llm, grafo)] ...
+
 # 6. Criando a API (FastAPI)
 app = FastAPI(title="Hub IA - Doctor Auto Prime")
 
-class KommoWebhook(BaseModel):
-    id_cliente: str
-    mensagem: str
-    nome_contato: str
+@app.get("/")
+async def pagina_inicial():
+    return {"status": "online", "mensagem": "Hub da Anna operando 100%!"}
 
 @app.post("/webhook/kommo")
-async def receber_mensagem(dados: KommoWebhook):
-    mensagem_usuario = HumanMessage(content=dados.mensagem)
+async def receber_mensagem(request: Request):
+    # 1. Recebemos a "avalanche" de dados do Kommo
+    form_data = await request.form()
+    dados_brutos = dict(form_data)
+    
+    # Isso vai aparecer nos logs do Render. Vai ser crucial para vermos 
+    # exatamente o nome do campo que o Kommo mandou a mensagem!
+    print("📦 PACOTE BRUTO DO KOMMO:", dados_brutos) 
+    
+    # 2. Pescamos a mensagem no meio do pacote (Esses são os campos padrão do Kommo, 
+    # mas se forem diferentes, o print acima vai nos mostrar o nome certo)
+    mensagem_cliente = dados_brutos.get("message[add][0][text]", "Oi")
+    nome_contato = dados_brutos.get("message[add][0][contact_name]", "Cliente")
+    
+    # 3. Preparamos o Estado para a Anna pensar
+    mensagem_usuario = HumanMessage(content=mensagem_cliente)
     estado_inicial = {
         "mensagens": [mensagem_usuario],
-        "nome_cliente": dados.nome_contato,
+        "nome_cliente": nome_contato,
         "temperatura_lead": "Frio",
         "dados_extraidos": {}
     }
     
+    # 4. Acordamos a Anna
     resultado = hub_app.invoke(estado_inicial)
     resposta_anna = resultado["mensagens"][-1].content
     
+    # 5. Devolvemos a resposta
+    print("🧠 RESPOSTA DA ANNA:", resposta_anna)
+    
     return {
         "status": "sucesso",
-        "resposta_anna": resposta_anna,
-        "dados_atualizados": resultado.get("dados_extraidos", {})
+        "resposta": resposta_anna
     }
