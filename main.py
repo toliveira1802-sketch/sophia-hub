@@ -187,8 +187,8 @@ with gr.Blocks(theme=gr.themes.Monochrome(), title="Hub Doctor Auto Prime") as t
         with gr.Column(scale=2):
             gr.Markdown("### 👩‍🔧 Anna - Setor: Pré-Vendas & Triagem")
             # Avatar da Anna (você pode trocar esse link por qualquer imagem depois)
-           chat_interface = gr.Chatbot(height=450, type="messages", avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"))
-           caixa_texto = gr.Textbox(label="Sua mensagem para a Anna", placeholder="Ex: Tenho um Jetta falhando...")
+            chat_interface = gr.Chatbot(height=450, type="messages", avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"))
+            caixa_texto = gr.Textbox(label="Sua mensagem para a Anna", placeholder="Ex: Tenho um Jetta falhando...")
             botao_enviar = gr.Button("Enviar", variant="primary")
             
         # Lado Direito: O Raio-X dos Dados
