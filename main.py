@@ -170,8 +170,9 @@ def interagir_no_hub(mensagem_usuario, historico):
     else:
         painel_raiox = "Nenhum dado de veículo extraído nesta mensagem."
         
-    # Formato universal blindado para o Gradio
-    historico.append([mensagem_usuario, resposta_anna])
+    # 🔧 O FIX DEFINITIVO: Entregando os "crachás" exatos que o servidor quer
+    historico.append({"role": "user", "content": mensagem_usuario})
+    historico.append({"role": "assistant", "content": resposta_anna})
     
     return "", historico, painel_raiox
 
@@ -182,7 +183,6 @@ with gr.Blocks(theme=gr.themes.Monochrome(), title="Hub Doctor Auto Prime") as t
     with gr.Row():
         with gr.Column(scale=2):
             gr.Markdown("### 👩‍🔧 Anna - Setor: Pré-Vendas & Triagem")
-            # Chatbot universal sem dependência de versão
             chat_interface = gr.Chatbot(height=450, avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"))
             caixa_texto = gr.Textbox(label="Sua mensagem para a Anna", placeholder="Ex: Tenho um carro falhando...")
             botao_enviar = gr.Button("Enviar", variant="primary")
