@@ -130,3 +130,50 @@ async def listar_campos():
         return {"erro": resposta.status_code, "detalhe": resposta.text}
     
     return {"status": "sucesso"}
+
+# --- FUNÇÃO PARA INJETAR DADOS NO CRM ---
+def atualizar_lead_kommo(lead_id: str, dados_extraidos: dict):
+    if not KOMMO_TOKEN or not KOMMO_URL:
+        print("⚠️ Faltam as chaves do Kommo para atualizar o lead!")
+        return
+        
+    url = f"{KOMMO_URL}/api/v4/leads/{lead_id}"
+    headers = {
+        "Authorization": f"Bearer {KOMMO_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    
+    campos_para_atualizar = []
+    
+    # 1. Injetando a MARCA (ID 966005)
+    if "marca_veiculo" in dados_extraidos and dados_extraidos["marca_veiculo"]:
+        campos_para_atualizar.append({
+            "field_id": 966005,
+            "values": [{"value": dados_extraidos["marca_veiculo"]}]
+        })
+        
+    # 2. Injetando o MODELO (ID 966007)
+    if "modelo_veiculo" in dados_extraidos and dados_extraidos["modelo_veiculo"]:
+        campos_para_atualizar.append({
+            "field_id": 966007,
+            "values": [{"value": dados_extraidos["modelo_veiculo"]}]
+        })
+
+    # 3. Injetando o NOME CLIENTE (ID 966001)
+    if "nome_cliente" in dados_extraidos and dados_extraidos["nome_cliente"]:
+        campos_para_atualizar.append({
+            "field_id": 966001,
+            "values": [{"value": dados_extraidos["nome_cliente"]}]
+        })
+
+    # Só dispara se tiver algum campo para atualizar
+    if not campos_para_atualizar:
+        return
+
+    payload = {
+        "custom_fields_values": campos_para_atualizar
+    }
+    
+    # Atira os dados pro CRM!
+    resposta = requests.patch(url, json=payload, headers=headers)
+    print("🎯 Status da injeção de dados no Lead:", resposta.status_code)
