@@ -3,3 +3,4 @@ uvicorn
 langgraph
 langchain-anthropic
 pydantic
+requests
