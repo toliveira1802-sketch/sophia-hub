@@ -31,7 +31,7 @@ class AgentState(TypedDict):
     dados_extraidos: dict
 
 # 3. Configuração da IA
-llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0.7)
+llm = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0.7)
 llm_com_ferramentas = llm.bind_tools([DadosKommo])
 
 # Prompt Mestre
