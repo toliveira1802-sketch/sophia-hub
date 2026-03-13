@@ -1,5 +1,25 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
-  "framework": "create-react-app"
+  "version": 2,
+  "crons": [
+    {
+      "path": "/api/cron/vigilante",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/analista",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/reativador",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/lembretes",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/relatorio",
+      "schedule": "0 19 * * *"
+    }
+  ]
 }
