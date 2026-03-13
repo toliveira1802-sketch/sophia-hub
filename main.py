@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
@@ -24,12 +24,11 @@ class AgentState(TypedDict):
     dados_extraidos: dict
 
 # 3. Configuração da IA (Anthropic)
-# O Render.com vai injetar a chave de API automaticamente
 llm = ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0.7)
 llm_com_ferramentas = llm.bind_tools([DadosKommo])
 
 # Prompt Mestre da Anna
-PROMPT_ANNA = """Você é a Anna, a assistente de pré-vendas e relacionamento da Doctor Auto Prime...
+PROMPT_ANNA = """Você é a Anna, a assistente de pré-vendas e relacionamento da Doctor Auto Prime.
 NUNCA passe preço para diagnóstico. Seja 100% humana e descontraída.
 Colete Marca, Modelo e Ano do carro. Fique atenta para sugerir descarbonização em motores TSI próximos aos 60 mil km."""
 
@@ -40,7 +39,6 @@ def no_anna(state: AgentState):
     
     resposta = llm_com_ferramentas.invoke(mensagens_para_llm)
     
-    # Se ela usou a ferramenta para extrair os dados
     if resposta.tool_calls:
         dados = resposta.tool_calls[0]['args']
         print("🚨 DADOS EXTRAÍDOS PARA O KOMMO:", dados)
@@ -51,7 +49,6 @@ def no_anna(state: AgentState):
             "dados_extraidos": dados
         }
     
-    # Se for só bate-papo
     return {"mensagens": mensagens_atuais + [resposta]}
 
 # 5. Montando o Grafo
@@ -61,10 +58,6 @@ grafo.add_edge(START, "Anna_SDR")
 grafo.add_edge("Anna_SDR", END)
 hub_app = grafo.compile()
 
-from fastapi import FastAPI, Request # <-- Adicionamos o Request aqui
-
-# ... [O resto do código lá em cima continua igual (estado, llm, grafo)] ...
-
 # 6. Criando a API (FastAPI)
 app = FastAPI(title="Hub IA - Doctor Auto Prime")
 
@@ -72,38 +65,36 @@ app = FastAPI(title="Hub IA - Doctor Auto Prime")
 async def pagina_inicial():
     return {"status": "online", "mensagem": "Hub da Anna operando 100%!"}
 
+# AQUI ESTÁ A CORREÇÃO DO ERRO 422: Usamos "Request" genérico
 @app.post("/webhook/kommo")
 async def receber_mensagem(request: Request):
-    # 1. Recebemos a "avalanche" de dados do Kommo
-    form_data = await request.form()
-    dados_brutos = dict(form_data)
+    # Aceita qualquer formato que vier (JSON ou Formulário)
+    try:
+        dados_brutos = await request.json()
+    except:
+        form_data = await request.form()
+        dados_brutos = dict(form_data)
+        
+    print("📦 PACOTE BRUTO DO KOMMO:", dados_brutos)
     
-    # Isso vai aparecer nos logs do Render. Vai ser crucial para vermos 
-    # exatamente o nome do campo que o Kommo mandou a mensagem!
-    print("📦 PACOTE BRUTO DO KOMMO:", dados_brutos) 
-    
-    # 2. Pescamos a mensagem no meio do pacote (Esses são os campos padrão do Kommo, 
-    # mas se forem diferentes, o print acima vai nos mostrar o nome certo)
+    # Tentamos pescar a mensagem (isso pode variar dependendo de como o Kommo envia)
+    # Se der erro aqui, o print acima vai nos salvar para ajustarmos a chave exata
     mensagem_cliente = dados_brutos.get("message[add][0][text]", "Oi")
-    nome_contato = dados_brutos.get("message[add][0][contact_name]", "Cliente")
     
-    # 3. Preparamos o Estado para a Anna pensar
-    mensagem_usuario = HumanMessage(content=mensagem_cliente)
+    mensagem_usuario = HumanMessage(content=str(mensagem_cliente))
     estado_inicial = {
         "mensagens": [mensagem_usuario],
-        "nome_cliente": nome_contato,
+        "nome_cliente": "Cliente",
         "temperatura_lead": "Frio",
         "dados_extraidos": {}
     }
     
-    # 4. Acordamos a Anna
     resultado = hub_app.invoke(estado_inicial)
     resposta_anna = resultado["mensagens"][-1].content
     
-    # 5. Devolvemos a resposta
     print("🧠 RESPOSTA DA ANNA:", resposta_anna)
     
     return {
         "status": "sucesso",
-        "resposta": resposta_anna
+        "resposta_anna": resposta_anna
     }
