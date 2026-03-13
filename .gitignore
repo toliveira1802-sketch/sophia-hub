@@ -1,1 +1,5 @@
 files.zip
+__pycache__/
+*.pyc
+.env
+New Documento de Texto.txt
