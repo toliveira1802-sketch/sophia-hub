@@ -149,3 +149,59 @@ async def receber_mensagem(request: Request):
         atualizar_lead_kommo(lead_id, resultado["dados_extraidos"])
     
     return {"status": "sucesso"}
+
+# ==========================================================
+# 🎛️ HUB VISUAL - CENTRO DE COMANDO DOCTOR AUTO PRIME
+# ==========================================================
+
+def interagir_no_hub(mensagem_usuario, historico):
+    # 1. Prepara o pacote pra Anna pensar
+    estado_teste = {
+        "mensagens": [HumanMessage(content=mensagem_usuario)],
+        "nome_cliente": "Thales (Teste do Hub)",
+        "temperatura_lead": "Frio",
+        "dados_extraidos": {}
+    }
+    
+    # 2. A Anna processa a mensagem
+    resultado = hub_app.invoke(estado_teste)
+    resposta_anna = resultado["mensagens"][-1].content
+    
+    # 3. Pega os dados que ela conseguiu extrair pra mostrar no seu Raio-X
+    dados = resultado.get("dados_extraidos", {})
+    if dados:
+        painel_raiox = json.dumps(dados, indent=2, ensure_ascii=False)
+    else:
+        painel_raiox = "Nenhum dado de veículo extraído nesta mensagem."
+        
+    # 4. Atualiza o chat na tela
+    historico.append((mensagem_usuario, resposta_anna))
+    
+    return "", historico, painel_raiox # Limpa a caixa de texto, atualiza chat e atualiza Raio-X
+
+# Desenhando a interface gráfica da Sala de Comando
+with gr.Blocks(theme=gr.themes.Monochrome(), title="Hub Doctor Auto Prime") as tela_do_hub:
+    gr.Markdown("# 🚘 Centro de Comando IA - Doctor Auto Prime")
+    gr.Markdown("Área restrita de testes. Interaja com as inteligências artificiais e valide a extração de dados antes da operação real.")
+    
+    with gr.Row():
+        # Lado Esquerdo: O Chat com a IA
+        with gr.Column(scale=2):
+            gr.Markdown("### 👩‍🔧 Anna - Setor: Pré-Vendas & Triagem")
+            # Avatar da Anna (você pode trocar esse link por qualquer imagem depois)
+            chat_interface = gr.Chatbot(height=450, avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"))
+            caixa_texto = gr.Textbox(label="Sua mensagem para a Anna", placeholder="Ex: Tenho um Jetta falhando...")
+            botao_enviar = gr.Button("Enviar", variant="primary")
+            
+        # Lado Direito: O Raio-X dos Dados
+        with gr.Column(scale=1):
+            gr.Markdown("### 🩻 Raio-X (Dados para o Kommo)")
+            gr.Markdown("Veja em tempo real o que a IA está capturando para injetar no CRM.")
+            tela_raiox = gr.Code(label="JSON Extraído", language="json", interactive=False)
+    
+    # Conectando os botões com a função de pensar da IA
+    caixa_texto.submit(interagir_no_hub, inputs=[caixa_texto, chat_interface], outputs=[caixa_texto, chat_interface, tela_raiox])
+    botao_enviar.click(interagir_no_hub, inputs=[caixa_texto, chat_interface], outputs=[caixa_texto, chat_interface, tela_raiox])
+
+# A mágica final: Colando essa tela visual dentro da sua API FastAPI que já existe
+app = gr.mount_gradio_app(app, tela_do_hub, path="/hub")

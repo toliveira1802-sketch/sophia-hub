@@ -4,3 +4,4 @@ langgraph
 langchain-anthropic
 pydantic
 requests
+gradio
