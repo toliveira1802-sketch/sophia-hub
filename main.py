@@ -105,5 +105,28 @@ async def receber_mensagem(request: Request):
         enviar_mensagem_whatsapp(chat_id, resposta_anna)
     else:
         print("⚠️ ID do chat não encontrado. Não foi possível responder.")
+
+@app.get("/listar-campos")
+async def listar_campos():
+    if not KOMMO_TOKEN or not KOMMO_URL:
+        return {"erro": "Faltam as chaves do Kommo no Render!"}
+        
+    url = f"{KOMMO_URL}/api/v4/leads/custom_fields"
+    headers = {
+        "Authorization": f"Bearer {KOMMO_TOKEN}"
+    }
+    
+    # O nosso próprio servidor faz a busca
+    resposta = requests.get(url, headers=headers)
+    
+    if resposta.status_code == 200:
+        dados = resposta.json()
+        campos = dados.get('_embedded', {}).get('custom_fields', [])
+        
+        # Monta um dicionário limpo só com Nome e ID
+        lista_limpa = {campo['name']: campo['id'] for campo in campos}
+        return lista_limpa
+    else:
+        return {"erro": resposta.status_code, "detalhe": resposta.text}
     
     return {"status": "sucesso"}
