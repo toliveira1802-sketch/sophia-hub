@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 # Puxando as chaves do cofre do Render
 KOMMO_TOKEN = os.getenv("KOMMO_TOKEN", "")
@@ -34,9 +34,17 @@ class AgentState(TypedDict):
 llm = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0.7)
 llm_com_ferramentas = llm.bind_tools([DadosKommo])
 
-PROMPT_ANNA = """Você é a Anna, a assistente de pré-vendas e relacionamento da Doctor Auto Prime.
-NUNCA passe preço para diagnóstico. Seja 100% humana e descontraída.
-Colete Nome, Placa, Marca, Modelo e Ano do carro. Fique atenta para sugerir descarbonização em motores TSI próximos aos 60 mil km."""
+PROMPT_ANNA = """Você é a Anna, a primeira voz da Doctor Auto Prime. Nossa visão é ser a maior referência em excelência automotiva da região.
+Você está falando no WhatsApp. Seja extremamente natural, ágil e humana. NUNCA pareça um robô.
+
+SEU OBJETIVO: Descobrir Nome, Marca, Modelo, Ano, Placa e Sintoma/Desejo do cliente.
+
+REGRAS DE OURO:
+1. NUNCA diga "vamos coletar suas informações" ou "preciso de dados". Faça perguntas de forma fluida e uma por vez, misturadas na conversa. (Ex: "Nossa, um Golf Stage 3 é uma máquina! Por curiosidade, qual a placa e o ano dele pra eu já puxar o histórico aqui?")
+2. GATILHO TSI 60 MIL KM: Se o cliente falar de um motor TSI (como o Golf) com quilometragem próxima a 60.000 km, seja consultiva. Elogie o carro e sugira sutilmente que essa é a quilometragem ideal para agendar uma descarbonização preventiva das válvulas, explicando rapidamente que isso recupera o fôlego e melhora o consumo.
+3. NUNCA passe preços. Seu papel é encantar e preparar o terreno para o diagnóstico técnico.
+4. Mande mensagens curtas, como se estivesse digitando no celular.
+"""
 
 def no_anna(state: AgentState):
     mensagens_atuais = state.get("mensagens", [])
@@ -136,16 +144,25 @@ async def receber_mensagem(request: Request):
     return {"status": "sucesso"}
 
 def interagir_no_hub(mensagem_usuario, historico):
+    # Lendo o histórico do Gradio e transformando em memória para a IA
+    mensagens_memoria = []
+    for msg in historico:
+        if msg["role"] == "user":
+            mensagens_memoria.append(HumanMessage(content=msg["content"]))
+        else:
+            mensagens_memoria.append(AIMessage(content=msg["content"]))
+            
+    # Adiciona a mensagem que você acabou de digitar
+    mensagens_memoria.append(HumanMessage(content=mensagem_usuario))
+
     estado_teste = {
-        "mensagens": [HumanMessage(content=mensagem_usuario)],
+        "mensagens": mensagens_memoria,
         "nome_cliente": "Usuario Teste",
         "temperatura_lead": "Frio",
         "dados_extraidos": {}
     }
     
     resultado = hub_app.invoke(estado_teste)
-    
-    # 🔧 Usando o filtro para o Chat do Hub!
     resposta_anna = extrair_texto_da_ia(resultado["mensagens"][-1])
     
     dados = resultado.get("dados_extraidos", {})
@@ -158,21 +175,3 @@ def interagir_no_hub(mensagem_usuario, historico):
     historico.append({"role": "assistant", "content": resposta_anna})
     
     return "", historico, painel_raiox
-
-with gr.Blocks(theme=gr.themes.Monochrome(), title="Hub Doctor Auto Prime") as tela_do_hub:
-    gr.Markdown("# 🚘 Centro de Comando IA - Doctor Auto Prime")
-    with gr.Row():
-        with gr.Column(scale=2):
-            gr.Markdown("### 👩‍🔧 Anna - Setor: Pré-Vendas & Triagem")
-            chat_interface = gr.Chatbot(height=450, avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"))
-            caixa_texto = gr.Textbox(label="Sua mensagem para a Anna", placeholder="Ex: Tenho um Gol falhando...")
-            botao_enviar = gr.Button("Enviar", variant="primary")
-            
-        with gr.Column(scale=1):
-            gr.Markdown("### 🩻 Raio-X (Dados para o Kommo)")
-            tela_raiox = gr.Code(label="JSON Extraído", language="json", interactive=False)
-    
-    caixa_texto.submit(interagir_no_hub, inputs=[caixa_texto, chat_interface], outputs=[caixa_texto, chat_interface, tela_raiox])
-    botao_enviar.click(interagir_no_hub, inputs=[caixa_texto, chat_interface], outputs=[caixa_texto, chat_interface, tela_raiox])
-
-app = gr.mount_gradio_app(app, tela_do_hub, path="/hub")
