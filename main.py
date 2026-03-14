@@ -34,6 +34,7 @@ class AgentState(TypedDict):
 llm = ChatAnthropic(model="claude-3-haiku-20240307", temperature=0.7)
 llm_com_ferramentas = llm.bind_tools([DadosKommo])
 
+# O NOVO CÉREBRO DA ANNA
 PROMPT_ANNA = """Você é a Anna, a primeira voz da Doctor Auto Prime. Nossa visão é ser a maior referência em excelência automotiva da região.
 Você está falando no WhatsApp. Seja extremamente natural, ágil e humana. NUNCA pareça um robô.
 
@@ -70,16 +71,13 @@ hub_app = grafo.compile()
 
 app = FastAPI(title="Hub IA - Doctor Auto Prime")
 
-# --- 🔧 O FILTRO BLINDADO DE TEXTO ---
+# --- O FILTRO BLINDADO DE TEXTO ---
 def extrair_texto_da_ia(resposta_ia):
-    # Se ela mandar texto misturado com pacote de dados (lista)
     if isinstance(resposta_ia.content, list):
         textos = [b["text"] for b in resposta_ia.content if isinstance(b, dict) and "text" in b]
         texto_final = " ".join(textos)
-        return texto_final if texto_final.strip() else "Perfeito, já registrei os detalhes técnicos do seu veículo!"
-    
-    # Se for só texto normal
-    return str(resposta_ia.content) if resposta_ia.content else "Detalhes anotados com sucesso!"
+        return texto_final if texto_final.strip() else "Perfeito, entendi os detalhes do carro!"
+    return str(resposta_ia.content) if resposta_ia.content else "Detalhes anotados!"
 
 def enviar_mensagem_whatsapp(chat_id: str, texto: str):
     if not KOMMO_TOKEN or not KOMMO_URL:
@@ -132,8 +130,6 @@ async def receber_mensagem(request: Request):
     }
     
     resultado = hub_app.invoke(estado_inicial)
-    
-    # 🔧 Usando o filtro para o WhatsApp também!
     resposta_anna = extrair_texto_da_ia(resultado["mensagens"][-1])
     
     if chat_id:
@@ -143,8 +139,8 @@ async def receber_mensagem(request: Request):
     
     return {"status": "sucesso"}
 
+# A NOVA MEMÓRIA DA ANNA NO HUB
 def interagir_no_hub(mensagem_usuario, historico):
-    # Lendo o histórico do Gradio e transformando em memória para a IA
     mensagens_memoria = []
     for msg in historico:
         if msg["role"] == "user":
@@ -152,7 +148,6 @@ def interagir_no_hub(mensagem_usuario, historico):
         else:
             mensagens_memoria.append(AIMessage(content=msg["content"]))
             
-    # Adiciona a mensagem que você acabou de digitar
     mensagens_memoria.append(HumanMessage(content=mensagem_usuario))
 
     estado_teste = {
@@ -175,3 +170,21 @@ def interagir_no_hub(mensagem_usuario, historico):
     historico.append({"role": "assistant", "content": resposta_anna})
     
     return "", historico, painel_raiox
+
+with gr.Blocks(theme=gr.themes.Monochrome(), title="Hub Doctor Auto Prime") as tela_do_hub:
+    gr.Markdown("# 🚘 Centro de Comando IA - Doctor Auto Prime")
+    with gr.Row():
+        with gr.Column(scale=2):
+            gr.Markdown("### 👩‍🔧 Anna - Setor: Pré-Vendas & Triagem")
+            chat_interface = gr.Chatbot(height=450, type="messages", avatar_images=(None, "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"))
+            caixa_texto = gr.Textbox(label="Sua mensagem para a Anna", placeholder="Ex: Tenho um Golf TSI...")
+            botao_enviar = gr.Button("Enviar", variant="primary")
+            
+        with gr.Column(scale=1):
+            gr.Markdown("### 🩻 Raio-X (Dados para o Kommo)")
+            tela_raiox = gr.Code(label="JSON Extraído", language="json", interactive=False)
+    
+    caixa_texto.submit(interagir_no_hub, inputs=[caixa_texto, chat_interface], outputs=[caixa_texto, chat_interface, tela_raiox])
+    botao_enviar.click(interagir_no_hub, inputs=[caixa_texto, chat_interface], outputs=[caixa_texto, chat_interface, tela_raiox])
+
+app = gr.mount_gradio_app(app, tela_do_hub, path="/hub")
